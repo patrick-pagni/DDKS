@@ -2,6 +2,7 @@ from .ddks import ddKS
 from .vdks import vdKS
 from .rdks import rdKS
 from .pdks import pdKS
+from .adks import adks
 import numpy as np
 import torch
 from hotelling.stats import hotelling_t2
