@@ -5,6 +5,8 @@ from scipy.special import binom
 import logging
 from itertools import product
 
+# TODO: Validate the output
+
 def S_(x, f):
     return np.power(-1, np.floor(4.0 * f * x))
 
@@ -68,7 +70,7 @@ class adKS(object):
 
         self.setup(pred,true)
 
-        D = self.calcD(pred, true)
+        D = self.calcD(pred)
 
         return D
 
@@ -84,16 +86,13 @@ class adKS(object):
         return _M
 
     def calcD(self, pred):
-        if pred.shape[1] != 3:
-            get_ort = self.get_orthants
-        else:
-            get_ort = self.get_octants
+        get_ort = self.get_orthants
 
         # Get orthants
         os_pp = get_ort(pred, self.Q)
 
         p_coords = self.cdf_coordinates(self.Q, self.support_lim)
-        os_pt = torch.stack([self.get_orthant_density(x, dist = self.dist) for x in p_coords])
+        os_pt = torch.stack([self.sort_orthants(self.get_orthant_density(x)) for x in p_coords])
 
         D1 = self.max((os_pp - os_pt).abs())
         if self.oneway:
@@ -101,7 +100,7 @@ class adKS(object):
         else:
             os_tp = get_ort(pred, self.U)
             t_coords = self.cdf_coordinates(self.U, self.support_lim)
-            os_tt = torch.stack([self.get_orthant_density(x, dist = self.dist) for x in t_coords])
+            os_tt = torch.stack([self.sort_orthants(self.get_orthant_density(x)) for x in t_coords])
             D2 = self.max((os_tt - os_tp).abs())
             D = max(D1,D2)
         if self.norm:
@@ -177,32 +176,6 @@ class adKS(object):
             for j in range(d):
                 x[i, j] = S_(i, np.power(2.0, -j - 2))
         return x
-
-    def get_octants(self, x, points):
-        N = x.shape[0]
-        # shape our input and test points into the right shape (N, 3, 1)
-        x = x.unsqueeze(-1)
-        points = points.unsqueeze(-1)
-        # repeat each input point in the dataset across the third dimension
-        x = x.repeat((1, 1, points.shape[0]))
-        # repeate each test in the dataset across the first dimension
-        comp_x = points.repeat((1, 1, x.shape[0]))
-        comp_x = comp_x.permute((2, 1, 0))
-        # now compare the input points and comparison points to see how many
-        # are bigger and smaller
-        x = self.ge(x, comp_x)
-        nx = (1 - torch.clone(x)).abs()
-        # now use the comparisoned points to construct each octant (& is logical and)
-        o1 = torch.sum(x[:, 0, :] * x[:, 1, :] * x[:, 2, :], dim=0).float() / N
-        o2 = torch.sum(x[:, 0, :] * x[:, 1, :] * nx[:, 2, :], dim=0).float() / N
-        o3 = torch.sum(x[:, 0, :] * nx[:, 1, :] * x[:, 2, :], dim=0).float() / N
-        o4 = torch.sum(x[:, 0, :] * nx[:, 1, :] * nx[:, 2, :], dim=0).float() / N
-        o5 = torch.sum(nx[:, 0, :] * x[:, 1, :] * x[:, 2, :], dim=0).float() / N
-        o6 = torch.sum(nx[:, 0, :] * x[:, 1, :] * nx[:, 2, :], dim=0).float() / N
-        o7 = torch.sum(nx[:, 0, :] * nx[:, 1, :] * x[:, 2, :], dim=0).float() / N
-        o8 = torch.sum(nx[:, 0, :] * nx[:, 1, :] * nx[:, 2, :], dim=0).float() / N
-        # return the stack of octants, should be (n, 8)
-        return torch.stack([o1, o2, o3, o4, o5, o6, o7, o8], dim=1)
     
     ###
     # Analytic CDF
@@ -250,13 +223,13 @@ class adKS(object):
 
         return out_terms
 
-    def get_orthant_density(self, coordinates, dist):    
+    def get_orthant_density(self, coordinates):    
 
         max_value = max([max(e) for e in coordinates])
         d = len(coordinates[0])
         n_orthants = int(np.power(2, d))
 
-        densities = dist.cdf(coordinates)
+        densities = self.dist.cdf(coordinates)
         densities = {point: density for point, density in zip(coordinates, densities)}
         
         orthant_densities = []
@@ -277,7 +250,7 @@ class adKS(object):
                     relevant_terms = self.compare_m_terms(m_term, m_terms)
                     relevant_densities = [density for m, density in orthant_densities if m.tolist() in relevant_terms]
                     orthant_density = current_density - (sum(relevant_densities))
-                    orthant_densities.append(orthant_density)
+                    orthant_densities.append((m_term, orthant_density))
 
             m_count += 1
             scoped_points = list(filter(lambda x: x.count(max_value) == m_count, coordinates))
@@ -285,6 +258,17 @@ class adKS(object):
 
         return orthant_densities
     
+    def sort_orthants(self, densities):
+        orthants = [i[0].tolist() for i in densities]
+        orthants.sort(reverse=True)
+        sorted_orthants = []
+        for orth in orthants:
+            orth = orth[::-1]
+            density = [e[1] for e in densities if e[0].tolist() == orth][0]
+            sorted_orthants.append(density)
+
+        return torch.Tensor(sorted_orthants)
+        
     ###
     #Testing/Validation Functions
     ###
