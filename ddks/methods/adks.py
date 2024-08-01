@@ -229,7 +229,7 @@ class adKS(object):
         d = len(coordinates[0])
         n_orthants = int(np.power(2, d))
 
-        densities = self.dist.cdf(coordinates)
+        densities = self.dist.cdf(coordinates).ravel()
         densities = {point: density for point, density in zip(coordinates, densities)}
         
         orthant_densities = []
@@ -259,6 +259,7 @@ class adKS(object):
         return orthant_densities
     
     def sort_orthants(self, densities):
+        d = len(densities[0][0])
         orthants = [i[0].tolist() for i in densities]
         orthants.sort(reverse=True)
         sorted_orthants = []
@@ -267,7 +268,10 @@ class adKS(object):
             density = [e[1] for e in densities if e[0].tolist() == orth][0]
             sorted_orthants.append(density)
 
-        return torch.Tensor(sorted_orthants)
+        if d==1:
+            return torch.Tensor(np.array(sorted_orthants)).squeeze(0)
+        else:
+            return torch.Tensor(np.array(sorted_orthants))
         
     ###
     #Testing/Validation Functions
