@@ -1,5 +1,11 @@
 # ddKS - a d-dimensional Kolmogorov-Smirnov Test
 
+This is a fork of the pnnl/ddks repo. The intention of the fork is to add a class which compares an empirical CDF and an analytic CDF. It is in the adKS file and is largely an extension of the DDKS file.
+
+Thanks to Hagen et al. for development of the original ddKS repository which inspired this change.
+
+# ReadMe
+
 *Alex Hagen<sup>1</sup>, Shane Jackson<sup>1</sup>, James Kahn<sup>2</sup>, Jan Strube<sup>1</sup>, Isabel Haide<sup>2</sup>, Karl Pazdernik<sup>1</sup>, and Connor Hainje<sup>1</sup>*
 
 <sup>1</sup>: Pacific Northwest National Laboratory, 
@@ -23,7 +29,7 @@ As of 6/25/2021 there are 3 methods implemented:
 Installation of `ddks` should be pretty easy, simple run
 
 ```bash
-pip install git+https://github.com/pnnl/DDKS
+pip install git+https://github.com/patrick-pagni/DDKS
 ```
 
 or, if you want to develop on DDKS, simply clone this repository into a safe
