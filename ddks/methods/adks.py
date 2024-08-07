@@ -324,15 +324,20 @@ class adKS(object):
     def m_line(self, delta, m_1, m_2):
         return max([m_1, m_2 * (1.0 - delta)])
 
-    def p_D(self, pred=None, true=None):
+    def p_D(self, pred=None, true=None, analytic_distribution = None, support_lim = None):
         if pred is None:
             pred = self.pred
         if true is None:
             true = self.true
+        if analytic_distribution is None:
+            analytic_distribution = self.dist
+        if support_lim is None:
+            support_lim = self.support_lim
+            
         m_1 = pred.shape[0]
         m_2 = true.shape[0]
         d = true.shape[1]
-        D = self(pred, true).item()
+        D = self(pred, true, analytic_distribution, support_lim).item()
         # round D to the nearest increment by the largest of the sample sizes
         m = m_1*m_2#max([m_1, m_2])
         D = np.round(m*D) / m
