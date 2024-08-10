@@ -57,10 +57,11 @@ class adKS(object):
         :param analytic_distribution: scipy.stats distribution of the true analytic cdf
         :return:
         '''
-        self.pred = pred
-        self.true = true
+        self.pred = torch.Tensor(pred)
+        self.true = torch.Tensor(true)
         self.dist = analytic_distribution
         self.support_lim = support_lim
+        print(support_lim)
 
         #Enforce N x d and d1=d2
         if len(pred.shape) < 2 or len(true.shape) < 2:
@@ -68,9 +69,9 @@ class adKS(object):
         if pred.shape[1] != true.shape[1]:
             warnings.warn(f'Dimension Mismatch between pred/true: Shapes should be [n1,d], [n2,d]')
 
-        self.setup(pred,true)
+        self.setup(self.pred,self.true)
 
-        D = self.calcD(pred)
+        D = self.calcD(self.pred)
 
         return D
 
@@ -78,10 +79,7 @@ class adKS(object):
         self.getQU(pred,true)
 
     def M(self, sample, test_points):
-        if sample.shape[1] != 3:
-            get_ort = self.get_orthants
-        else:
-            get_ort = self.get_octants
+        get_ort = self.get_orthants
         _M = get_ort(sample, test_points)
         return _M
 
@@ -91,20 +89,24 @@ class adKS(object):
         # Get orthants
         os_pp = get_ort(pred, self.Q)
 
-        p_coords = self.cdf_coordinates(self.Q, self.support_lim)
-        os_pt = torch.stack([self.sort_orthants(self.get_orthant_density(x)) for x in p_coords])
+        p_coords = self.cdf_coordinates(self.Q.tolist(), self.support_lim)
+        os_pt = [self.sort_orthants(self.get_orthant_density(x)) for x in p_coords]
+        print(os_pt)
+
+        os_pt = torch.stack(os_pt)
 
         D1 = self.max((os_pp - os_pt).abs())
         if self.oneway:
             D = D1
         else:
             os_tp = get_ort(pred, self.U)
-            t_coords = self.cdf_coordinates(self.U, self.support_lim)
+            t_coords = self.cdf_coordinates(self.U.tolist(), self.support_lim)
             os_tt = torch.stack([self.sort_orthants(self.get_orthant_density(x)) for x in t_coords])
             D2 = self.max((os_tt - os_tp).abs())
             D = max(D1,D2)
         if self.norm:
             D = D / float(pred.shape[0])
+
         return D
     
     ###
@@ -225,18 +227,19 @@ class adKS(object):
 
     def get_orthant_density(self, coordinates):    
 
-        max_value = max([max(e) for e in coordinates])
         d = len(coordinates[0])
+        max_value = self.support_lim
+
         n_orthants = int(np.power(2, d))
 
         densities = self.dist.cdf(coordinates).ravel()
-        densities = {point: density for point, density in zip(coordinates, densities)}
+        densities_dict = {point: density for point, density in zip(coordinates, densities)}
         
         orthant_densities = []
 
         m_count = 0
         scoped_points = list(filter(lambda x: x.count(max_value) == m_count, coordinates))
-        scoped_densities = [((np.array(point) == max_value).astype(int), density) for point, density in densities.items() if point in scoped_points]
+        scoped_densities = [((np.array(point) == max_value).astype(int), density) for point, density in densities_dict.items() if point in scoped_points]
 
         while len(orthant_densities) < n_orthants:
 
@@ -254,7 +257,7 @@ class adKS(object):
 
             m_count += 1
             scoped_points = list(filter(lambda x: x.count(max_value) == m_count, coordinates))
-            scoped_densities = [((np.array(point) == max_value).astype(int), density)  for point, density in densities.items() if point in scoped_points]
+            scoped_densities = [((np.array(point) == max_value).astype(int), density)  for point, density in densities_dict.items() if point in scoped_points]
 
         return orthant_densities
     
@@ -333,7 +336,7 @@ class adKS(object):
             analytic_distribution = self.dist
         if support_lim is None:
             support_lim = self.support_lim
-            
+
         m_1 = pred.shape[0]
         m_2 = true.shape[0]
         d = true.shape[1]
@@ -341,7 +344,6 @@ class adKS(object):
         # round D to the nearest increment by the largest of the sample sizes
         m = m_1*m_2#max([m_1, m_2])
         D = np.round(m*D) / m
-        #print(D, 'D')
         lambda_ik = self.M(true, torch.cat((pred, true))).numpy()
         # _p_D is the probability that every entry in M is less than or equal to
         # D
@@ -350,6 +352,7 @@ class adKS(object):
             for k in range(lambda_ik.shape[1]):
                 p_gtdelta = self.p_gtdelta(D, m_1, m_2, lambda_ik[i, k])
                 _p_D *= 1.0 - p_gtdelta
+
         # we desire to know the probability that something will be larger than D
         return 1.0 - _p_D
 
