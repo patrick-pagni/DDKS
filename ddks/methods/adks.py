@@ -61,7 +61,6 @@ class adKS(object):
         self.true = torch.Tensor(true)
         self.dist = analytic_distribution
         self.support_lim = support_lim
-        print(support_lim)
 
         #Enforce N x d and d1=d2
         if len(pred.shape) < 2 or len(true.shape) < 2:
@@ -91,7 +90,6 @@ class adKS(object):
 
         p_coords = self.cdf_coordinates(self.Q.tolist(), self.support_lim)
         os_pt = [self.sort_orthants(self.get_orthant_density(x)) for x in p_coords]
-        print(os_pt)
 
         os_pt = torch.stack(os_pt)
 
